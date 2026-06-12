@@ -10,6 +10,16 @@ def check_fio():
     except Exception:
         pytest.skip("fio is not installed. Skipping performance tests.")
 
+def _print_fio_results(test_name, output):
+    """Parse and print fio results clearly."""
+    print(f"\n========================================")
+    print(f" {test_name} Performance Results")
+    print(f"========================================")
+    for line in output.split('\n'):
+        if "IOPS=" in line:
+            print("  " + line.strip())
+    print(f"========================================\n")
+
 def test_performance_fio_random_rw(dm_xor):
     """Run a simple fio benchmark on the dm-xor target to ensure no deadlocks and get a baseline."""
     # Create a reasonably sized target for fio
@@ -29,11 +39,7 @@ def test_performance_fio_random_rw(dm_xor):
         assert "error" not in output.lower(), "fio run completed but reported errors."
         assert "IOPS" in output, "fio run completed but IOPS not found in output."
         
-        # We can print the output for the user to see in pytest -s
-        print("\nFIO Output Summary:")
-        for line in output.split('\n'):
-            if "IOPS" in line:
-                print(line.strip())
+        _print_fio_results("Random Read/Write", output)
                 
     except Exception as e:
         pytest.fail(f"fio stress test failed: {e}")
@@ -51,5 +57,9 @@ def test_performance_fio_seq_write(dm_xor):
     try:
         output = run_cmd(fio_cmd)
         assert "error" not in output.lower()
+        assert "IOPS" in output
+        
+        _print_fio_results("Sequential Write", output)
     except Exception as e:
         pytest.fail(f"fio sequential write test failed: {e}")
+
