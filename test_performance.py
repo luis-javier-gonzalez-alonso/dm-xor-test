@@ -10,17 +10,19 @@ def check_fio():
     except Exception:
         pytest.skip("fio is not installed. Skipping performance tests.")
 
-def _print_fio_results(test_name, output):
-    """Parse and print fio results clearly."""
-    print(f"\n========================================")
-    print(f" {test_name} Performance Results")
-    print(f"========================================")
+def _store_fio_results(request, test_name, output):
+    """Parse fio results clearly and store them in pytest config."""
+    if not hasattr(request.config, "performance_results"):
+        request.config.performance_results = {}
+        
+    lines = []
     for line in output.split('\n'):
         if "IOPS=" in line:
-            print("  " + line.strip())
-    print(f"========================================\n")
+            lines.append(line.strip())
+            
+    request.config.performance_results[test_name] = lines
 
-def test_performance_fio_random_rw(dm_xor):
+def test_performance_fio_random_rw(dm_xor, request):
     """Run a simple fio benchmark on the dm-xor target to ensure no deadlocks and get a baseline."""
     # Create a reasonably sized target for fio
     xor_dev, backing_devs = dm_xor(dev_count=2, size_mb=200)
@@ -39,12 +41,12 @@ def test_performance_fio_random_rw(dm_xor):
         assert "error" not in output.lower(), "fio run completed but reported errors."
         assert "IOPS" in output, "fio run completed but IOPS not found in output."
         
-        _print_fio_results("Random Read/Write", output)
+        _store_fio_results(request, "Random Read/Write", output)
                 
     except Exception as e:
         pytest.fail(f"fio stress test failed: {e}")
 
-def test_performance_fio_seq_write(dm_xor):
+def test_performance_fio_seq_write(dm_xor, request):
     """Run sequential write benchmark."""
     xor_dev, backing_devs = dm_xor(dev_count=3, size_mb=200)
     
@@ -59,7 +61,7 @@ def test_performance_fio_seq_write(dm_xor):
         assert "error" not in output.lower()
         assert "IOPS" in output
         
-        _print_fio_results("Sequential Write", output)
+        _store_fio_results(request, "Sequential Write", output)
     except Exception as e:
         pytest.fail(f"fio sequential write test failed: {e}")
 

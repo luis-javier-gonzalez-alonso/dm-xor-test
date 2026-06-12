@@ -51,3 +51,13 @@ def check_root():
 def load_module():
     """Attempt to load the dm-xor module if not loaded."""
     run_cmd("sudo modprobe dm-xor", check=False)
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    perf_results = getattr(config, "performance_results", None)
+    if perf_results:
+        terminalreporter.section("Performance Results Summary", sep="=", bold=True, blue=True)
+        for test_name, lines in perf_results.items():
+            terminalreporter.write_line(f"• {test_name}:")
+            for line in lines:
+                terminalreporter.write_line(f"    {line}")
+        terminalreporter.write_line("")
