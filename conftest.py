@@ -55,7 +55,8 @@ def load_module():
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     perf_results = getattr(config, "performance_results", None)
     if perf_results:
-        terminalreporter.section("Performance Results Summary", sep="=", bold=True, blue=True)
+        terminalreporter.write_line("")
+        terminalreporter.write_sep("=", "Performance Results Summary", bold=True, blue=True)
         for test_name, lines in perf_results.items():
             terminalreporter.write_line(f"• {test_name}:")
             for line in lines:

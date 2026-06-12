@@ -65,7 +65,9 @@ else
     echo "Skipping requirements installation (no changes detected)."
 fi
 
+echo ""
 echo "========================================"
 echo " Triggering Tests"
 echo "========================================"
+echo ""
 pytest -s -v
