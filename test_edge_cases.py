@@ -49,7 +49,7 @@ def test_dm_flakey_composition(loop_devices, tmp_path):
         run_cmd(f"dd if=/dev/urandom of={test_file} bs=1M count=1 status=none")
         
         try:
-            run_cmd(f"sudo dd if={test_file} of={xor_dev_path} bs=1M status=none")
+            run_cmd(f"sudo dd if={test_file} of={xor_dev_path} bs=1M oflag=direct status=none")
             pytest.fail("Write should have failed due to underlying dm-flakey dropping I/O")
         except Exception as e:
             # We expect a failure. dd usually returns non-zero.
