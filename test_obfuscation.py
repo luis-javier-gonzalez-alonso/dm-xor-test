@@ -50,3 +50,51 @@ def test_xor_math(dm_xor, tmp_path):
     new_md5 = run_cmd(f"sudo dd if={xor_dev} bs=1M count=1 iflag=direct status=none | md5sum | awk '{{print $1}}'")
     
     assert orig_md5 != new_md5, "Changing the backing drive did not change the read result of the dm-xor device."
+
+def test_manual_xor_matches_virtual_device(dm_xor, tmp_path):
+    """
+    Test that applying bitwise XOR at the byte level between all backing files
+    provides the exact same content as reading from the virtual device.
+    """
+    dev_count = 3
+    xor_dev, backing_devs = dm_xor(dev_count=dev_count, size_mb=10)
+    
+    # Write some random data to the virtual device
+    test_data = os.urandom(1024 * 1024) # 1 MB
+    test_file = tmp_path / "test_data.bin"
+    with open(test_file, "wb") as f:
+        f.write(test_data)
+        
+    run_cmd(f"sudo dd if={test_file} of={xor_dev} bs=1M count=1 oflag=direct status=none")
+    run_cmd("sudo sync && sudo sysctl -w vm.drop_caches=3", check=False)
+    
+    # Read the data back from the virtual device
+    virt_read_file = tmp_path / "virt_read.bin"
+    run_cmd(f"sudo dd if={xor_dev} of={virt_read_file} bs=1M count=1 iflag=direct status=none")
+    
+    # Read the data from each backing device
+    backing_files = []
+    for i, dev in enumerate(backing_devs):
+        back_file = tmp_path / f"back_{i}.bin"
+        run_cmd(f"sudo dd if={dev} of={back_file} bs=1M count=1 iflag=direct status=none")
+        backing_files.append(back_file)
+        
+    # Read all contents into memory
+    with open(virt_read_file, "rb") as f:
+        virt_data = f.read()
+        
+    backing_data_list = []
+    for bf in backing_files:
+        with open(bf, "rb") as f:
+            backing_data_list.append(f.read())
+            
+    # Perform bitwise XOR across all backing data
+    # int.from_bytes is extremely fast for huge byte arrays in Python
+    result_int = int.from_bytes(backing_data_list[0], 'little')
+    for i in range(1, len(backing_data_list)):
+        current_int = int.from_bytes(backing_data_list[i], 'little')
+        result_int ^= current_int
+        
+    result_data = result_int.to_bytes(len(virt_data), 'little')
+    
+    assert result_data == virt_data, "Manual XOR of backing devices does NOT match virtual device content!"
