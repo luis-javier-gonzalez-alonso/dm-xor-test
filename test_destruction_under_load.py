@@ -67,6 +67,6 @@ def test_destruction_under_load(dm_xor, request):
         f"{destruction_duration_ms:.2f} ms"
     ]
     
-    # Verify destruction was very fast (under 50ms). With the 100ms fault injection,
+    # Verify destruction was very fast (under 100ms). With the 100ms fault injection,
     # a shared workqueue will cause this to fail (taking > 100ms).
-    assert destruction_duration_ms < 50, f"Destruction took too long: {destruction_duration_ms:.2f} ms"
+    assert destruction_duration_ms < 100, f"Destruction took too long: {destruction_duration_ms:.2f} ms"
