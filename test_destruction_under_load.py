@@ -48,8 +48,12 @@ def test_destruction_under_load(dm_xor, request):
             
             destruction_duration_ms = (end_time - start_time) * 1000.0
 
-            # Wait for the heavy IO to complete to ensure no errors occurred
-            future.result()
+            # Wait for the heavy IO to complete to ensure no errors occurred.
+            # If the global workqueue drops the bio due to __WQ_DRAINING, fio will hang forever.
+            try:
+                future.result(timeout=10)
+            except concurrent.futures.TimeoutError:
+                pytest.fail("Active target I/O locked up completely! The global workqueue dropped a bio during drain.")
 
     finally:
         # Always disable fault injection delay afterwards
