@@ -79,17 +79,23 @@ def test_internal_fault_oom_page_fallback(dm_xor, inject_fault, request):
     """
     dev_path, _ = dm_xor(dev_count=2, size_mb=100)
     
-    # Baseline Run (No faults)
-    fio_cmd = (f"sudo fio --name=test --filename={dev_path} --rw=randrw --rwmixread=50 "
-               f"--bs=4k --size=50M --direct=1 --verify=pattern --verify_pattern=0xdeadbeef --do_verify=1")
+    # Baseline Performance Run (High concurrency, no verify)
+    fio_perf_cmd = (f"sudo fio --name=perf --filename={dev_path} --rw=randrw --rwmixread=50 "
+                    f"--bs=4k --size=50M --direct=1 --ioengine=libaio --iodepth=32 --numjobs=4 "
+                    f"--group_reporting")
     
-    baseline_out = run_cmd(fio_cmd)
+    baseline_out = run_cmd(fio_perf_cmd)
     _store_fio_results(request, "OOM_PAGE_Baseline", baseline_out)
     
-    # Fault Run
+    # Fault Performance Run
     inject_fault(XOR_FAULT_OOM_PAGE)
-    fault_out = run_cmd(fio_cmd)
+    fault_out = run_cmd(fio_perf_cmd)
     _store_fio_results(request, "OOM_PAGE_Degraded", fault_out)
+    
+    # Data Integrity Run (Single-threaded, strict verification to ensure slow-path is correct)
+    fio_verify_cmd = (f"sudo fio --name=verify --filename={dev_path} --rw=write "
+                      f"--bs=4k --size=10M --direct=1 --verify=pattern --verify_pattern=0xdeadbeef --do_verify=1")
+    run_cmd(fio_verify_cmd)
 
 
 def test_internal_fault_oom_clone_fallback(dm_xor, inject_fault, request):
@@ -101,17 +107,23 @@ def test_internal_fault_oom_clone_fallback(dm_xor, inject_fault, request):
     """
     dev_path, _ = dm_xor(dev_count=2, size_mb=100)
     
-    # Baseline Run (No faults)
-    fio_cmd = (f"sudo fio --name=test --filename={dev_path} --rw=randrw --rwmixread=50 "
-               f"--bs=4k --size=50M --direct=1 --verify=pattern --verify_pattern=0xcafebabe --do_verify=1")
+    # Baseline Performance Run (High concurrency, no verify)
+    fio_perf_cmd = (f"sudo fio --name=perf --filename={dev_path} --rw=randrw --rwmixread=50 "
+                    f"--bs=4k --size=50M --direct=1 --ioengine=libaio --iodepth=32 --numjobs=4 "
+                    f"--group_reporting")
     
-    baseline_out = run_cmd(fio_cmd)
+    baseline_out = run_cmd(fio_perf_cmd)
     _store_fio_results(request, "OOM_CLONE_Baseline", baseline_out)
     
-    # Fault Run
+    # Fault Performance Run
     inject_fault(XOR_FAULT_OOM_CLONE)
-    fault_out = run_cmd(fio_cmd)
+    fault_out = run_cmd(fio_perf_cmd)
     _store_fio_results(request, "OOM_CLONE_Degraded", fault_out)
+    
+    # Data Integrity Run
+    fio_verify_cmd = (f"sudo fio --name=verify --filename={dev_path} --rw=write "
+                      f"--bs=4k --size=10M --direct=1 --verify=pattern --verify_pattern=0xcafebabe --do_verify=1")
+    run_cmd(fio_verify_cmd)
 
 
 def test_internal_fault_crypto_failure(dm_xor, inject_fault):
