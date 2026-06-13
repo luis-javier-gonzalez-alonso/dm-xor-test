@@ -16,11 +16,11 @@ def test_destruction_under_load(dm_xor, request):
     victim_name = victim_dev.split('/')[-1]
 
     def write_heavy_load():
-        # Use fio for continuous random writes over 5 seconds
+        # Use fio for continuous random writes over a short 2-second window
         fio_cmd = (
-            f"sudo fio --name=stress --ioengine=libaio --iodepth=64 "
+            f"sudo fio --name=stress --ioengine=libaio --iodepth=8 "
             f"--rw=randwrite --bs=4k --direct=1 "
-            f"--runtime=5 --time_based --filename={active_dev} "
+            f"--runtime=2 --time_based --filename={active_dev} "
             f"--group_reporting"
         )
         return run_cmd(fio_cmd)
@@ -63,6 +63,6 @@ def test_destruction_under_load(dm_xor, request):
         f"{destruction_duration_ms:.2f} ms"
     ]
     
-    # Verify destruction was fast (e.g. under 200ms). If it shares a workqueue, 
-    # it would take several seconds waiting for the 5-second fio run to finish.
-    assert destruction_duration_ms < 200, f"Destruction took too long: {destruction_duration_ms:.2f} ms"
+    # Verify destruction was very fast (under 50ms). With the 100ms fault injection,
+    # a shared workqueue will cause this to fail (taking > 100ms).
+    assert destruction_duration_ms < 50, f"Destruction took too long: {destruction_duration_ms:.2f} ms"
