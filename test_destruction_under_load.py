@@ -25,24 +25,35 @@ def test_destruction_under_load(dm_xor, request):
         )
         return run_cmd(fio_cmd)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        # Start heavy IO on active_dev
-        future = executor.submit(write_heavy_load)
-        
-        # Give fio a moment to spin up and saturate the device/workqueues
-        time.sleep(1)
-        
-        # Measure destruction time of the idle victim device
-        start_time = time.time()
-        # Since dm_xor fixture automatically tears down, we tear it down manually here 
-        # to measure the exact dmsetup remove latency.
-        run_cmd(f"sudo dmsetup remove {victim_name}")
-        end_time = time.time()
-        
-        destruction_duration_ms = (end_time - start_time) * 1000.0
+    # Enable fault injection delay via sysfs (Bit 0 = delay write)
+    try:
+        run_cmd("echo 1 | sudo tee /sys/module/dm_xor/parameters/enabled_faults")
+    except Exception as e:
+        pytest.skip(f"Could not enable fault injection (is module loaded?): {e}")
 
-        # Wait for the heavy IO to complete to ensure no errors occurred
-        future.result()
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            # Start heavy IO on active_dev
+            future = executor.submit(write_heavy_load)
+            
+            # Give fio a moment to spin up and saturate the device/workqueues
+            time.sleep(1)
+            
+            # Measure destruction time of the idle victim device
+            start_time = time.time()
+            # Since dm_xor fixture automatically tears down, we tear it down manually here 
+            # to measure the exact dmsetup remove latency.
+            run_cmd(f"sudo dmsetup remove {victim_name}")
+            end_time = time.time()
+            
+            destruction_duration_ms = (end_time - start_time) * 1000.0
+
+            # Wait for the heavy IO to complete to ensure no errors occurred
+            future.result()
+
+    finally:
+        # Always disable fault injection delay afterwards
+        run_cmd("echo 0 | sudo tee /sys/module/dm_xor/parameters/enabled_faults", check=False)
 
     # Log the result
     if not hasattr(request.config, "performance_results"):
